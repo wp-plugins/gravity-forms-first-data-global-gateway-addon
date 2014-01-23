@@ -38,16 +38,6 @@ needs to complete the purchase.
 
 Once you have done so, test your forms to ensure it is processing payment.
 
-= Debugging =
-
-To get debug information when a form is submitted, just use 
-(in `wp-config.php`):
-
-	define('GFFD_DEBUG_FORM_SUBMIT', true);
-
-This will stop Gravity Forms from submitting the entry and express a
-`var_dump` and `exit()`.
-
 = Development =
 
 Development for this plugins happens over at [Github](https://github.com/excion/gravityforms-firstdata).
@@ -59,7 +49,7 @@ We use this public [Trello board](https://trello.com/b/lsE1MvCV) for managing th
 == Installation ==
 
 Install by uploading the .zip, or by searching for this plugin, 
-from WordPress Dashboard > Plugins > Add New. 
+from WordPress Dashboard > Plugins > Add New.
 
 == Screenshots ==
 
