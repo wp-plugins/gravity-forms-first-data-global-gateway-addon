@@ -4,19 +4,77 @@
 // to perform a purchase on a GFFD
 // active form.
 
-function gffd_gform_entry_created( $entry, $the_submitted_form ){
-	// When it's created, we're fine with what is stored.
-	// But, in the future we may store more stuff.
+// Show the customer reference number on the entry
+function gffd_gform_entry_detail_content_before( $form, $lead ) {
+
+	$customer_reference_number = get_option(
+		'gffd_fd_' . $lead['id']
+	);
+
+	if( $customer_reference_number ) {
+		?>
+		<table cellspacing="0" class="widefat fixed entry-detail-view">
+			<tbody>
+			<tr>
+				<td colspan="2" class="entry-view-field-name">
+					<?php _e( 'Reference Number'); ?>
+				</td>
+			</tr>
+			<tr>
+				<td class="entry-view-field-value">
+					<?php echo $customer_reference_number; ?>
+				</td>
+			</tr>
+			</tbody>
+		</table>
+		<?php
+	}
 }
 
-add_action('gffd_gform_entry_created','gform_entry_created');
+add_action(
+	'gform_entry_detail_content_before',
+	'gffd_gform_entry_detail_content_before',
+	10, 2
+);
+
+// Make sure, when the entry is entered,
+function gffd_gform_post_submission( $entry, $form ) {
+
+	// Get the temporary stored reference number saved on FD
+	$customer_reference_number = get_option(
+		//gffd_fd_12_9.9.9.9
+		"gffd_fd_" . $form['id'] . "_" . $_SERVER['REMOTE_ADDR']
+	);
+
+	if( $customer_reference_number ) {
+
+		// Re-store this information for this lead (entry)
+		update_option(
+			'gffd_fd_' . $entry['id'],
+			$customer_reference_number
+		);
+
+		// Delete the temp store
+		delete_option( "gffd_fd_" . $form['id'] . "_" . $_SERVER['REMOTE_ADDR'] );
+
+	}
+}
+
+add_action(
+	'gform_post_submission',
+	'gffd_gform_post_submission',
+	10, 2
+);
 
 // Validate the data, reformat the data,
 // try and perform the purchase and throw errors.
+//
+// Otherwise, do the purchase, save the reference number
+// and continue to adding entry.
 function gffd_validation_and_payment($validation_result){
 
 	$form_id = $validation_result['form']['id'];
-	$the_submitted_form=$_REQUEST; //for easier reading.
+	$the_submitted_form = $_REQUEST; //for easier reading.
 
 	// Is this form supposed to be used by gffd?
 	if( gffd_feed_is_active($form_id) ){
@@ -80,7 +138,7 @@ function gffd_validation_and_payment($validation_result){
 						]
 					] = $gffd_is_valid_pre_format_feed_data;
 
-				// If even one of the items fail, jump out, 
+				// If even one of the items fail, jump out,
 				// thrown an error and try again.
 				}else{
 
@@ -110,7 +168,7 @@ function gffd_validation_and_payment($validation_result){
 			// Okay, one of the fields were missing.
 			}else{
 				// If a field is missing, let's just do nothing and submit
-				// the form. But, we will at least email the admin about it, 
+				// the form. But, we will at least email the admin about it,
 				// because we did not do the purchase.
 			}
 
@@ -126,82 +184,130 @@ function gffd_validation_and_payment($validation_result){
 		// and perform the purchase.
 		}else{
 
-			$result = gffd_fd_purchase_by_form($gffd_fd_form_info, 'as_original');
+			// Set the customer reference number on FD
+			$gffd_fd_form_info['gffd_fd_customer_ref']
+				= gffd_fd_customer_ref( $form_id );
 
-			if(gffd_is_array($result)){
-				if($result['error']){
-					wp_die($result['error_message']);
-				}				
-			}
+			// Save the reference number to the DB temporarily so we can
+			// get it later.
+			update_option(
 
-			// To debug just use define('GFFD_DEBUG_FORM_SUBMIT', true);
-			// in wp-config.php
-			if(defined('GFFD_DEBUG_FORM_SUBMIT')){
+				// Save gffd_fd_form_#_#.#.#
 
-				echo "<pre>";
-					var_dump(
-						//$result['gffd_fd_instance']->getBankResponseMessage()
-						$result
-					);
-				echo "</pre>";
+				// form_id shoudn't change: gffd_fd_12
+				"gffd_fd_$form_id"
 
-				exit;
+					// Remote IP shouldn't change:
+					// When the entry is added, we want to look for
+					//
+					// gffd_fd_12_9.9.9.9
+					//
+					. "_" . $_SERVER['REMOTE_ADDR'],
 
-			// If the dev doesn't want to GFFD_DEBUG_FORM_SUBMIT
-			}else{
+				// Save the reference number we saved in FD trasnsaction log
+				$gffd_fd_form_info['gffd_fd_customer_ref']
+			);
 
-				// If there was an error, and we've submitted
-				// the data for purchase, let's see what the 
-				// bank or FirstData class said.
-				if($result['error']===true){
+			// Run a purchase by form
+			$result = gffd_fd_purchase_by_form(
+				$gffd_fd_form_info,
+				'as_original'
+			);
 
-					// Don't submit the entry.
-					$validation_result["is_valid"]=false;
+			if(
+				// If we have results
+				gffd_is_array($result)
 
-					// If there is a bank response, let's 
-					// pass that to the CC field
-					if($result['gffd_fd_instance']->getBankResponseMessage()){
-						$validation_result
-							=gffd_wp_die_by_fd_response(
-								$result,
-								'getBankResponseMessage'
-							);
-						
-					}elseif($result['gffd_fd_instance']->getErrorMessage()){
-						// Try and see if there is just a generic
-						// error message.
-						$validation_result
-							=gffd_wp_die_by_fd_response(
-								$result,
-								'getErrorMessage'
-							);
-					}
+				// If there isn't an error message
+				&& ! $result['error_message']
 
-					return $validation_result;
+				// And, we haven't set debug mode in wp-config.php
+				&& ! defined('GFFD_DEBUG_FORM_SUBMIT')
 
-				// If there was no bank response, but an error,
-				// we don't know what is wrong!
+				// And there was some sort of error
+				&& $result['error']
+			){
+
+				// Just show a simple error.
+				wp_die( __(
+					"There was an error, but FirstData didn't
+						send back an error message."
+				) );
+
+				// Want to see what the error is? Just set
+				// define('GFFD_DEBUG_FORM_SUBMIT', true);
+				// in wp-config.php and try again
+			} else {
+
+				// To debug just use define('GFFD_DEBUG_FORM_SUBMIT', true);
+				// in wp-config.php
+				if(defined('GFFD_DEBUG_FORM_SUBMIT')){
+
+					echo "<pre>";
+						var_dump(
+							//$result['gffd_fd_instance']->getBankResponseMessage()
+							$result
+						);
+					echo "</pre>";
+
+					exit;
+
+				// If the dev doesn't want to GFFD_DEBUG_FORM_SUBMIT
 				}else{
 
-					// Throw a general error message.
-					foreach($validation_result['form']['fields'] as &$field){
-						if($field['type']=='creditcard'){
-							// Tell GF what field failed. Here, 
-							// always the CC.
-							$field["failed_validation"]=true;
+					// If there was an error, and we've submitted
+					// the data for purchase, let's see what the
+					// bank or FirstData class said.
+					if($result['error']===true){
 
-							// Pass the bank response back to 
-							// GF validation_message.
-							$field["validation_message"]
-								= __(
-									"Sorry, but there was an error with the"
-									."information provided. Please correct and try again. "
-									."If this persists, contact the site owner."
+						// Don't submit the entry.
+						$validation_result["is_valid"]=false;
+
+						// If there is a bank response, let's
+						// pass that to the CC field
+						if($result['gffd_fd_instance']->getBankResponseMessage()){
+							$validation_result
+								=gffd_wp_die_by_fd_response(
+									$result,
+									'getBankResponseMessage'
+								);
+
+						}elseif($result['gffd_fd_instance']->getErrorMessage()){
+							// Try and see if there is just a generic
+							// error message.
+							$validation_result
+								=gffd_wp_die_by_fd_response(
+									$result,
+									'getErrorMessage'
 								);
 						}
-					}
 
-					return $validation_result;
+						return $validation_result;
+
+					// If there was no bank response, but an error,
+					// we don't know what is wrong!
+					}else{
+
+						// Throw a general error message.
+						foreach($validation_result['form']['fields'] as &$field){
+							if($field['type']=='creditcard'){
+								// Tell GF what field failed. Here,
+								// always the CC.
+								$field["failed_validation"]=true;
+
+								// Pass the bank response back to
+								// GF validation_message.
+								$field["validation_message"]
+									= __(
+										"Sorry, but there was an error with the"
+										."information provided. Please correct and try again. "
+										."If this persists, contact the site owner."
+									);
+							}
+						}
+
+						return $validation_result;
+					}
 				}
 			}
 
@@ -228,7 +334,7 @@ function gffd_wp_die_by_fd_response($result, $kind){
 	}
 
 	wp_die(
-		"<h1>".$message."</h1>" 
+		"<h1>".$message."</h1>"
 		."<br><br>"
 
 		.__(
@@ -250,7 +356,7 @@ function gffd_gf_forms_js(){
 	wp_enqueue_script(
 		'gffd-gf-forms-js',
 		plugins_url(
-			'gffd-gf-forms.js', 
+			'gffd-gf-forms.js',
 			___GFFDFILE___
 		),
 		array(),
@@ -260,5 +366,21 @@ function gffd_gf_forms_js(){
 }
 
 add_action('gform_enqueue_scripts','gffd_gf_forms_js');
+
+// Generate a reference number for FD
+function gffd_fd_customer_ref( $form_id ) {
+	return substr(
+
+		// Nice hash based on form id and the user's IP.
+		md5(
+			$form_id
+			. $_SERVER['REMOTE_ADDR']
+			. time()
+		),
+
+		// Only 8 chars
+		0, 8
+	);
+}
 
 ?>

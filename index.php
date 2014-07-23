@@ -1,10 +1,10 @@
 <?php
 
 /*
-Plugin Name: Gravity Forms + First Data Global Gateway e4℠
-Plugin URI: https://bitbucket.org/excion/gravityforms-firstdata
-Description: Gravity Forms + First Data Global Gateway e4℠ is a plugin and addon for Gravity Forms that will allow you to process products using the First Data Global Gateway e4℠ API.
-Version: 1.0.2
+Plugin Name: Gravity Forms + First Data Global Gateway e4
+Plugin URI: https://wordpress.org/plugins/gravity-forms-first-data-global-gateway-addon/
+Description: Gravity Forms + First Data Global Gateway e4 is a plugin and addon for Gravity Forms that will allow you to process products using the First Data Global Gateway e4 API.
+Version: 1.1
 Author: Aubrey Portwood of Excion
 Author URI: http://excion.co
 License: GPL2
@@ -37,7 +37,7 @@ License: GPL2
 
 // First Data e4 PHP Wrapper
 // https://github.com/VinceG/php-first-data-api
-require_once "php-first-data-api/FirstData.php";
+require_once "php-first-data-api/src/VinceG/FirstDataApi/FirstData.php";
 
 // Primary API functions for FirstData.
 // Can be used w/out GF
@@ -68,7 +68,7 @@ function gffd_check_requirements(){
 		&& class_exists("GFCommon")
 	){
 
-		// If we have the requirements, 
+		// If we have the requirements,
 		// let's prepare everything:
 
 		// Integrate with Gravity Forms
