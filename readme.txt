@@ -12,6 +12,10 @@ Gravity Forms Addon for the First Data Global Gateway e4
 
 == Description ==
 
+**I am trying to get a weeks worth of time funded for me to fix this plugin and push out a new release.**
+
+Please check out: [http://www.gofundme.com/gffde4](http://www.gofundme.com/gffde4)
+
 **Gravity Forms + First Data Global Gateway e4** is a plugin and addon for
 Gravity Forms that will allow you to process products using the
 [First Data Global Gateway e4](https://www.firstdata.com/en_us/products/merchants/ecommerce/online-payment-processing.html) service.
@@ -40,8 +44,7 @@ Once you have done so, test your forms to ensure it is processing payment.
 
 = Development =
 
-Development for this plugins happens over at [Github](https://github.com/excion/gravityforms-firstdata)
-and our Issue Tracker is on [Trello](https://trello.com/b/iaFkdo91).
+Development for this plugins happens over at [Github](https://github.com/excion/gravityforms-firstdata).
 
 == Installation ==
 
